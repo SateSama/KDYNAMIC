@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>PC Dynamic Island</title>
+<style>
+:root{
+  --bgA:.9; --bg:rgba(0,0,0,var(--bgA));
+  --fg:#f4f4f6; --muted:#85858d; --line:rgba(255,255,255,.07); --soft:rgba(255,255,255,.07);
+  --blur:30px; --rscale:1; --speed:1;
+  --spring:cubic-bezier(.3,1.2,.4,1);
+}
+body.light{--bg:rgba(250,250,252,var(--bgA));--fg:#111;--muted:#777;--line:rgba(0,0,0,.08);--soft:rgba(0,0,0,.06)}
+*{box-sizing:border-box;margin:0;-webkit-user-select:none;user-select:none}
+html,body{height:100%;background:transparent}
+body{font-family:"Segoe UI Variable","Segoe UI",system-ui,sans-serif;color:var(--fg);overflow:hidden;font-size:13px}
+body.web{background:radial-gradient(1000px 600px at 60% 10%,#262b3d,#0c0d12 70%)}
+.stage{display:flex;justify-content:center;padding-top:12px}
+
+#island{
+  position:relative;overflow:hidden;width:120px;height:30px;border-radius:15px;
+  background:var(--bg);
+  backdrop-filter:blur(var(--blur)) saturate(150%);-webkit-backdrop-filter:blur(var(--blur)) saturate(150%);
+  box-shadow:0 0 0 1px var(--line),0 14px 36px rgba(0,0,0,.4);
+  transition:width calc(.5s*var(--speed)) var(--spring),height calc(.5s*var(--speed)) var(--spring),border-radius calc(.5s*var(--speed)) var(--spring);
+}
+.view{position:absolute;inset:0;padding:12px 16px;opacity:0;pointer-events:none;transform:scale(.97);filter:blur(5px);
+  transition:opacity calc(.25s*var(--speed)),transform calc(.35s*var(--speed)) var(--spring),filter calc(.25s*var(--speed))}
+.view.on{opacity:1;pointer-events:auto;transform:none;filter:none;transition-delay:calc(.1s*var(--speed))}
+button{background:none;border:0;color:inherit;font:inherit;cursor:pointer}
+.ico{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;color:var(--muted);transition:background .2s,color .2s;font-size:15px}
+.ico:hover{background:var(--soft);color:var(--fg)}
+.close{position:absolute;top:14px;right:12px;width:28px;height:28px;font-size:12px}
+
+/* barre d'onglets visible dans chaque vue */
+.nav{display:flex;align-items:center;gap:4px;flex:none;padding-right:36px}
+.tab{display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;color:var(--muted);font-size:12px;white-space:nowrap;transition:background .2s,color .2s}
+.tab:hover{background:var(--soft);color:var(--fg)}
+.tab.on{background:var(--fg);color:var(--bg)}
+body:not(.light) .tab.on{color:#000}
+.tab .dot{flex:none}
+
+/* idle */
+.idle{display:flex;align-items:center;justify-content:center;padding:0}
+.idle i{width:28px;height:4px;border-radius:2px;background:var(--soft)}
+#island[data-state="idle"]{cursor:pointer}
+
+/* launcher */
+.launcher{display:flex;align-items:center;justify-content:center;gap:6px;padding:0}
+.launcher .ico{font-size:14px;font-weight:600}
+
+/* music mini */
+.mini{display:flex;align-items:center;gap:10px;padding:0 14px;cursor:pointer}
+.art{border-radius:7px;background:linear-gradient(135deg,#6b7280,#d1d5db);flex:none}
+.mini .art{width:24px;height:24px}
+.mini .t{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--muted)}
+.mini .t b{color:var(--fg);font-weight:500}
+.eq{display:flex;gap:2px;align-items:flex-end;height:14px}
+.eq i{width:2px;background:var(--fg);border-radius:1px;animation:eq 1s ease-in-out infinite}
+.eq i:nth-child(2){animation-delay:.2s}.eq i:nth-child(3){animation-delay:.4s}
+.paused .eq i{animation-play-state:paused;height:3px}
+@keyframes eq{0%,100%{height:3px}50%{height:14px}}
+
+/* music full */
+.full{display:flex;flex-direction:column;gap:10px;padding:14px 18px 16px}
+.full .row{display:flex;gap:12px;align-items:center}
+.full .art{width:64px;height:64px;border-radius:12px}
+.full h3{font-size:15px;font-weight:600}.full p{color:var(--muted);margin-top:2px}
+.bar{height:4px;background:var(--soft);border-radius:2px;cursor:pointer}
+.bar>div{height:100%;width:30%;background:var(--fg);border-radius:2px}
+.ctrl{display:flex;justify-content:center;align-items:center;gap:14px}
+.ctrl .ico{font-size:17px}
+.times{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:-4px}
+
+/* chat */
+.chat{display:flex;flex-direction:column;gap:10px;padding:14px 16px}
+.head{display:flex;align-items:center;gap:8px;color:var(--muted);height:26px}
+.head b{color:var(--fg);font-weight:600}
+.dot{width:7px;height:7px;border-radius:50%}
+.msgs{flex:1;overflow:auto;display:flex;flex-direction:column;gap:8px;-webkit-user-select:text;user-select:text}
+.m{max-width:86%;padding:8px 12px;border-radius:16px;line-height:1.45;position:relative}
+.m.u{align-self:flex-end;background:var(--fg);color:var(--bg)}
+body:not(.light) .m.u{color:#000}
+.m.a{align-self:flex-start;background:var(--soft)}
+.m .cp{position:absolute;right:-24px;top:6px;opacity:0;color:var(--muted);cursor:pointer;font-size:12px}
+.m:hover .cp{opacity:1}
+.input{display:flex;gap:8px;align-items:center;background:var(--soft);border-radius:18px;padding:3px 3px 3px 14px}
+.input input{flex:1;background:none;border:0;outline:0;color:var(--fg);font:inherit;padding:8px 0;-webkit-user-select:text;user-select:text}
+.input .ico{background:var(--fg);color:var(--bg);width:30px;height:30px}
+
+/* double */
+.double{display:flex;flex-direction:column;gap:10px;padding:14px 16px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;flex:1;min-height:0}
+.col{background:var(--soft);border-radius:18px;padding:12px 14px;overflow:auto;line-height:1.5;-webkit-user-select:text;user-select:text}
+.col h4{font-size:11px;font-weight:500;color:var(--muted);margin-bottom:6px;display:flex;gap:6px;align-items:center}
+.link{color:var(--muted);font-size:12px;padding:4px 8px;border-radius:8px}.link:hover{color:var(--fg);background:var(--soft)}
+
+/* notif */
+.notif{display:flex;align-items:center;gap:12px;padding:0 20px}
+.notif .ic{width:30px;height:30px;border-radius:50%;background:var(--soft);display:grid;place-items:center;flex:none}
+.notif b{display:block;font-weight:500}.notif span{color:var(--muted);font-size:12px}
+
+/* settings */
+.set{display:flex;flex-direction:column;gap:8px;padding:14px 18px;overflow:auto}
+.set label{display:flex;justify-content:space-between;align-items:center;color:var(--muted);gap:10px}
+.set input[type=range]{width:150px;accent-color:var(--fg)}
+.set input[type=password]{width:170px;background:var(--soft);border:0;border-radius:8px;padding:6px 9px;color:var(--fg);outline:0;-webkit-user-select:text;user-select:text}
+.set h3{font-size:11px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px}
+
+.demo{position:fixed;bottom:16px;left:0;right:0;text-align:center;color:#6c7088;font-size:12px}
+.demo button{color:#9da2bd;padding:4px 10px;border-radius:8px}.demo button:hover{background:#ffffff12}
+body:not(.web) .demo{display:none}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div id="island" data-state="idle">
+
+    <div class="view idle on" data-v="idle"><i></i></div>
+
+    <div class="view launcher" data-v="launcher">
+      <button class="ico" data-go="music" title="Musique">♫</button>
+      <button class="ico" data-go="chat" data-ai="ChatGPT" title="ChatGPT">G</button>
+      <button class="ico" data-go="chat" data-ai="Claude" title="Claude">C</button>
+      <button class="ico" data-go="double" title="Double AI">⇄</button>
+      <button class="ico" data-go="settings" title="Paramètres">⚙</button>
+    </div>
+
+    <div class="view mini" data-v="music" id="mini">
+      <div class="art"></div>
+      <div class="t"><b>Blinding Lights</b> · The Weeknd</div>
+      <div class="eq"><i></i><i></i><i></i></div>
+    </div>
+
+    <div class="view full" data-v="musicFull">
+      <div class="nav"></div>
+      <button class="ico close" data-go="music" title="Réduire">✕</button>
+      <div class="row"><div class="art"></div><div><h3>Blinding Lights</h3><p>The Weeknd</p></div></div>
+      <div class="bar" id="bar"><div id="prog"></div></div>
+      <div class="times"><span id="tc">1:05</span><span id="tr">-2:55</span></div>
+      <div class="ctrl">
+        <button class="ico">⏮</button><button class="ico" id="play">⏸</button><button class="ico">⏭</button>
+      </div>
+    </div>
+
+    <div class="view chat" data-v="chat">
+      <div class="nav"></div>
+      <button class="ico close" data-go="idle" title="Fermer">✕</button>
+      <span id="chatName" hidden>ChatGPT</span><span id="aiDot" hidden></span>
+      <div class="msgs" id="msgs"><div class="m a">Comment puis-je t'aider ?<span class="cp">⧉</span></div></div>
+      <div class="input"><input id="q" placeholder="Écrire un message…"><button class="ico" id="send">↑</button></div>
+    </div>
+
+    <div class="view double" data-v="double">
+      <div class="nav"></div>
+      <button class="ico close" data-go="idle" title="Fermer">✕</button>
+      <div class="head" style="justify-content:space-between"><span>Même question envoyée aux deux IA</span><button class="link" id="cmp">Comparer les réponses</button></div>
+      <div class="cols">
+        <div class="col"><h4><span class="dot" style="background:#10a37f"></span>ChatGPT</h4><div id="ra">—</div></div>
+        <div class="col"><h4><span class="dot" style="background:#d97757"></span>Claude</h4><div id="rb">—</div></div>
+      </div>
+      <div class="input"><input id="q2" placeholder="Une question pour les deux IA…"><button class="ico" id="send2">↑</button></div>
+    </div>
+
+    <div class="view notif" data-v="notif">
+      <div class="ic">⬇</div><div><b>Téléchargement terminé</b><span>setup.exe · 142 Mo</span></div>
+    </div>
+
+    <div class="view set" data-v="settings">
+      <div class="nav"></div>
+      <button class="ico close" data-go="idle" title="Fermer">✕</button>
+      <h3>Apparence</h3>
+      <label>Transparence <input type="range" id="sOp" min="40" max="100" value="90"></label>
+      <label>Flou <input type="range" id="sBlur" min="0" max="50" value="30"></label>
+      <label>Arrondi <input type="range" id="sRad" min="40" max="150" value="100"></label>
+      <label>Vitesse <input type="range" id="sSpd" min="40" max="200" value="100"></label>
+      <label>Thème clair <input type="checkbox" id="sTheme"></label>
+      <h3>Clés API</h3>
+      <label>OpenAI <input type="password" placeholder="sk-…"></label>
+      <label>Anthropic <input type="password" placeholder="sk-ant-…"></label>
+    </div>
+  </div>
+</div>
+
+<div class="demo">Aperçu navigateur · <button id="fireNotif">simuler une notification</button> · Alt+Espace · Ctrl+1/2/3 · Échap</div>
+
+<script>
+const T = window.__TAURI__, inv = T && T.core ? T.core.invoke : null;
+if(!inv) document.body.classList.add('web');
+const $ = s => document.querySelector(s), isl = $('#island'), root = document.documentElement.style;
+
+// [largeur, hauteur, rayon]
+const SIZES = {idle:[120,30,15],launcher:[290,56,28],music:[310,42,21],musicFull:[470,222,26],
+  chat:[530,400,26],double:[860,440,28],notif:[340,56,28],settings:[470,390,26]};
+
+// onglets affichés en haut de chaque vue
+const TABS = [
+  {go:'musicFull', label:'Musique', ic:'♫'},
+  {go:'chat', ai:'ChatGPT', label:'ChatGPT', dot:'#10a37f'},
+  {go:'chat', ai:'Claude', label:'Claude', dot:'#d97757'},
+  {go:'double', label:'Double AI', ic:'⇄'},
+  {go:'settings', label:'', ic:'⚙', title:'Réglages'}
+];
+function buildNav(){
+  document.querySelectorAll('.nav').forEach(n=>{
+    TABS.forEach(t=>{
+      const b = document.createElement('button'); b.className='tab'; b.dataset.go=t.go;
+      if(t.ai) b.dataset.ai=t.ai; if(t.title) b.title=t.title;
+      if(t.dot){ const d=document.createElement('span'); d.className='dot'; d.style.background=t.dot; b.append(d); }
+      if(t.ic) b.append(t.ic+(t.label?' ':''));
+      if(t.label) b.append(t.label);
+      n.append(b);
+    });
+  });
+}
+function setActive(){
+  const ai = $('#chatName').textContent;
+  document.querySelectorAll('.nav .tab').forEach(t=>{
+    const g = t.dataset.go; let on;
+    if(cur==='musicFull' || cur==='music') on = g==='musicFull';
+    else if(cur==='chat') on = g==='chat' && t.dataset.ai===ai;
+    else on = g===cur;
+    t.classList.toggle('on', on);
+  });
+}
+let cur = 'idle', speed = 1, notifTimer, resizeTimer;
+
+function resizeWindow(w,h){ if(inv) inv('resize_island',{width:w+48,height:h+28}); }
+
+function go(state){
+  const [w,h,r] = SIZES[state], [pw,ph] = SIZES[cur];
+  clearTimeout(resizeTimer);
+  if(w*h >= pw*ph) resizeWindow(w,h);                               // on agrandit la fenêtre d'abord
+  else resizeTimer = setTimeout(()=>resizeWindow(w,h), 520*speed);    // on la réduit après l'animation
+  cur = state; isl.dataset.state = state;
+  isl.style.width = w+'px'; isl.style.height = h+'px'; isl.style.borderRadius = (r*rscale)+'px';
+  document.querySelectorAll('.view').forEach(v=>v.classList.toggle('on', v.dataset.v===state));
+  setActive();
+  if(state==='chat') setTimeout(()=>$('#q').focus(),350);
+  if(state==='double') setTimeout(()=>$('#q2').focus(),350);
+}
+let rscale = 1;
+
+document.addEventListener('click', e=>{
+  const b = e.target.closest('[data-go]');
+  if(b){ e.stopPropagation();
+    if(b.dataset.ai){ $('#chatName').textContent=b.dataset.ai; $('#aiDot').style.background=b.dataset.ai==='Claude'?'#d97757':'#10a37f'; }
+    go(b.dataset.go); return; }
+  if(cur==='idle') go('launcher');
+  else if(cur==='launcher' && e.target===isl) go('idle');
+  else if(e.target.closest('#mini')) go('musicFull');
+});
+$('#aiDot').style.background = '#10a37f';
+
+// notification
+function notify(){ const back = ['idle','notif'].includes(cur) ? 'idle' : cur; go('notif');
+  clearTimeout(notifTimer); notifTimer = setTimeout(()=>go(back), 3200); }
+$('#fireNotif').onclick = e=>{ e.stopPropagation(); notify(); };
+
+// musique (démo)
+let playing = true, t = 65, dur = 240;
+const fmt = s => Math.floor(s/60)+':'+String(Math.floor(s%60)).padStart(2,'0');
+$('#play').onclick = e=>{ e.stopPropagation(); playing=!playing; $('#play').textContent=playing?'⏸':'▶'; isl.classList.toggle('paused',!playing); };
+$('#bar').onclick = e=>{ const r=e.currentTarget.getBoundingClientRect(); t=(e.clientX-r.left)/r.width*dur; };
+setInterval(()=>{ if(playing) t=(t+1)%dur;
+  $('#prog').style.width=(t/dur*100)+'%'; $('#tc').textContent=fmt(t); $('#tr').textContent='-'+fmt(dur-t); },1000);
+
+// chat (simulé – les vraies API arrivent à l'étape suivante)
+function addMsg(txt,cls){ const d=document.createElement('div'); d.className='m '+cls;
+  const s=document.createElement('span'); s.textContent=txt; d.append(s);
+  const c=document.createElement('span'); c.className='cp'; c.textContent='⧉'; c.onclick=()=>navigator.clipboard&&navigator.clipboard.writeText(txt); d.append(c);
+  $('#msgs').append(d); $('#msgs').scrollTop=1e6; return s; }
+function ask(){ const v=$('#q').value.trim(); if(!v) return; $('#q').value=''; addMsg(v,'u');
+  const r=addMsg('…','a'); setTimeout(()=>r.textContent=`(${$('#chatName').textContent}, simulé) Réponse de démonstration à : « ${v} »`,600); }
+$('#send').onclick=ask; $('#q').onkeydown=e=>{ if(e.key==='Enter') ask(); };
+function ask2(){ const v=$('#q2').value.trim(); if(!v) return; $('#q2').value=''; $('#ra').textContent='…'; $('#rb').textContent='…';
+  setTimeout(()=>$('#ra').textContent=`(ChatGPT, simulé) Réponse à « ${v} » : synthétique, structurée.`,500);
+  setTimeout(()=>$('#rb').textContent=`(Claude, simulé) Réponse à « ${v} » : détaillée et nuancée.`,900); }
+$('#send2').onclick=ask2; $('#q2').onkeydown=e=>{ if(e.key==='Enter') ask2(); };
+$('#cmp').onclick=()=>{ $('#rb').append(document.createElement('br'), 'Comparaison (simulée) : les deux réponses convergent.'); };
+
+// paramètres
+$('#sOp').oninput = e=>root.setProperty('--bgA', e.target.value/100);
+$('#sBlur').oninput = e=>root.setProperty('--blur', e.target.value+'px');
+$('#sRad').oninput = e=>{ rscale=e.target.value/100; isl.style.borderRadius=(SIZES[cur][2]*rscale)+'px'; };
+$('#sSpd').oninput = e=>{ speed=100/e.target.value; root.setProperty('--speed',speed); };
+$('#sTheme').onchange = e=>document.body.classList.toggle('light',e.target.checked);
+
+// raccourcis (locaux ; les raccourcis globaux Windows arrivent avec le backend)
+document.addEventListener('keydown', e=>{
+  if(e.altKey && e.code==='Space'){ e.preventDefault(); go(cur==='idle'?'launcher':'idle'); }
+  else if(e.ctrlKey && e.key==='1'){ e.preventDefault(); $('#chatName').textContent='ChatGPT'; $('#aiDot').style.background='#10a37f'; go('chat'); }
+  else if(e.ctrlKey && e.key==='2'){ e.preventDefault(); $('#chatName').textContent='Claude'; $('#aiDot').style.background='#d97757'; go('chat'); }
+  else if(e.ctrlKey && e.key==='3'){ e.preventDefault(); go('double'); }
+  else if(e.ctrlKey && e.key==='4'){ e.preventDefault(); go('musicFull'); }
+  else if(e.key==='Escape') go('idle');
+});
+
+buildNav();
+go('idle');
+</script>
+</body>
+</html>
